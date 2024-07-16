@@ -17,6 +17,7 @@ struct Player {
     std::string name;
     int p_spieler;
     int p_turnier;
+    int new_points;
 };
 
 struct Range{
@@ -28,7 +29,7 @@ struct Range{
 void is_numeric(std::string& s) {
     for (size_t i = 0; i < s.size(); i++) {
         if (!(s[i] >= '0' && s[i] <= '9')) {
-            throw std::invalid_argument("Ungueltige Eingabe");
+            throw std::invalid_argument("[FEHLER!] Ungueltige Eingabe");
         }
     }
 }
@@ -48,13 +49,22 @@ private:
         {0,299,2000,2999,TIE},
         {300,599,2000,2999,CLOSE_WIN},
         {600,1199,2000,2999,WIN},
-        {1200,MAX_POINTS,2000,2999,MASSACRE}
+        {1200,MAX_POINTS,2000,2999,MASSACRE},
+        {0,499,3000,3999,TIE},
+        {500,899,3000,3999,CLOSE_WIN},
+        {900,1799,3000,3999,WIN},
+        {900,1799,3000,3999,WIN},
+        {1800,MAX_POINTS,3000,3999,MASSACRE}
         //TO BE EXPANDED
+
+
+
 
 
     };
 
     int get_turnier_points(int delta) {
+        if (delta < 0 || delta > MAX_POINTS){return INVALID_TURNIER_POINTS;}
         for (const auto& r : ranges) {
             if ((delta >= r.low1 && delta <= r.high1) && (this->points_per_page >= r.low2 && this->points_per_page <= r.high2)){
                 return r.output;
@@ -87,7 +97,7 @@ public:
         int output = get_turnier_points(delta);
         std::cout << "Delta: " << delta << ", Turnierpunkte: " << output << std::endl;
         if(output == INVALID_TURNIER_POINTS){
-            std::cout << "Ungueltige Eingabe!" << std::endl;
+            std::cout << "[FEHLER!] Ungueltige Eingabe!" << std::endl;
             return; //Sollte nicht passieren
         }
 
@@ -105,9 +115,9 @@ public:
     }
 
     void calc_delta() {
-        delta = std::abs(p1->p_spieler - p2->p_spieler);
+        delta = std::abs(p1->new_points - p2->new_points);
 
-        p1_is_winner = p1->p_spieler > p2->p_spieler;
+        p1_is_winner = p1->new_points > p2->new_points;
         calc_turnier_points();
     }
 };
@@ -141,14 +151,14 @@ public:
                 n_players = std::stoi(n_players_str);
             }catch (std::exception& e) {
                 if (std::string(e.what()) == "stoi") {
-                    std::cout << "Ungueltige Eingabe!" << std::endl;
+                    std::cout << "[FEHLER!] Ungueltige Eingabe!" << std::endl;
                     continue;
                 }
                 std::cout << e.what() << std::endl;
                 continue;
             }
             if (n_players % 2 != 0) {
-                std::cout << "Spieleranzahl muss gerade sein!" << std::endl;
+                std::cout << "[FEHLER!] Spieleranzahl muss gerade sein!" << std::endl;
             }
             else { break; }
         }
@@ -160,7 +170,7 @@ public:
                 std::cout << "Spielername von Spieler " << i + 1 << ": ";
                 std::getline(std::cin, name);
                 if (name.empty()) {
-                    std::cout << "Spielername darf nicht leer sein!" << std::endl;
+                    std::cout << "[FEHLER!] Spielername darf nicht leer sein!" << std::endl;
                 }
                 else {
                     break;
@@ -171,7 +181,7 @@ public:
             p->p_spieler = 0;
             players.push_back(std::move(p));
         }
-        // Herausforderung hinzufügen
+        // Herausforderung hinzufuegen
     }
     
 
@@ -187,7 +197,7 @@ public:
                 break;
             }catch(std::exception& e){
                 if (std::string(e.what()) == "stoi") {
-                    std::cout << "Ungueltige Eingabe!" << std::endl;
+                    std::cout << "[FEHLER!] Ungueltige Eingabe!" << std::endl;
                     continue;
                 }
                 std::cout << e.what() << std::endl;
@@ -210,10 +220,10 @@ public:
                 is_numeric(tbl);
                 int i = std::stoi(tbl);
                 if (i > static_cast<int>(players.size() / 2) || i < 1) {
-                    throw std::invalid_argument("Eingabe ausserhalb der Tischanzahl");
+                    throw std::invalid_argument("[FEHLER!] Eingabe ausserhalb der Tischanzahl");
                 }
                 if (tables[i - 1]->done) {
-                    throw std::invalid_argument("Tisch bereits fertig");
+                    throw std::invalid_argument("[FEHLER!] Tisch bereits fertig");
                 }
                 for (int j = 0; j < 2; j++) {
                     std::string points;
@@ -223,8 +233,9 @@ public:
                     is_numeric(points);
 
                     if (std::stoi(points) < 0) {
-                        throw std::invalid_argument("Eingabe negativ");
+                        throw std::invalid_argument("[FEHLER!] Eingabe negativ");
                     }
+                    tables[i - 1]->get_p_idx(j)->new_points = std::stoi(points);
                     tables[i - 1]->get_p_idx(j)->p_spieler += std::stoi(points);
                 }
 
@@ -237,7 +248,7 @@ public:
             }
             catch (const std::exception& e) {
                 if (std::string(e.what()) == "stoi") {
-                    std::cout << "Ungueltige Eingabe!" << std::endl;
+                    std::cout << "[FEHLER!] Ungueltige Eingabe!" << std::endl;
                     continue;
                 }
                 std::cout << e.what() << std::endl;
@@ -279,11 +290,29 @@ public:
             table->done = false;
         }
     }
-
+    /*
+    a t1  -> a -> a 1.
+    b t1  -> b -> d 3.
+    c t2  -> d -> b 2.
+    d t2  -> c -> c 4.
+    */
     void play_round() {
         undo_tables();
-        // Add check, if players have played against each other in the round before
+        
         for (size_t i = 0; i < tables.size(); i++) {
+            //Check if both players have already played on this table the round before
+            if((players[i * 2].get() == tables[i]->get_p1() && players[i * 2 + 1].get() == tables[i]->get_p2()) || (players[i * 2].get() == tables[i]->get_p2() && players[i * 2 + 1].get() == tables[i]->get_p1())) {
+                std::cout << "[ACHTUNG!] Spieler " << players[i * 2].get()->name << " und " << players[i * 2 + 1].get()->name << " haben bereits gegeneinander gespielt" << std::endl;
+                //if so, test to see if a swap is possible and swap two indices after the current player[i*2]
+                if(i * 2 + 2 < players.size()){
+                    std::cout << "[ACHTUNG!] Spieler "<< players[i * 2 + 1].get()->name << " und " << players[i * 2 + 2].get()->name << " werden getauscht" << std::endl;
+                    std::iter_swap(players.begin() + (i * 2 + 1), players.begin() + (i * 2 + 2));
+                    tables[i]->set_p2(players[i * 2 + 1].get());
+                    continue;
+                }else{
+                    std::cout << "[ACHTUNG!] Kein Tausch von Spielern möeglich" << std::endl;
+                }
+            }
             tables[i]->set_p1(players[i * 2].get());
             tables[i]->set_p2(players[i * 2 + 1].get());
         }
@@ -299,10 +328,12 @@ public:
 };
 
 int main() {
-    std::cout << "Willkommen zum Turnier-Schema!" << std::endl;
+    
+    std::cout << "Willkommen zum Turnier-Schema!\n" << std::endl;
     Tournament tournament;
     tournament.init_players();
     tournament.init_tables();
+    std::cout << "\n----------- Runde 1 -----------\n" << std::endl;
     tournament.play_first_round();
     tournament.sort_players();
     tournament.print_players();
