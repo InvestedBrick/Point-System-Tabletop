@@ -310,7 +310,7 @@ public:
                     tables[i]->set_p2(players[i * 2 + 1].get());
                     continue;
                 }else{
-                    std::cout << "[ACHTUNG!] Kein Tausch von Spielern möeglich" << std::endl;
+                    std::cout << "[ACHTUNG!] Kein Tausch von Spielern moeglich" << std::endl;
                 }
             }
             tables[i]->set_p1(players[i * 2].get());
