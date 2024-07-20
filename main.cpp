@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <random>
 #include <memory>
+#include <unordered_map>
 
 #define TIE 1
 #define CLOSE_WIN 2
@@ -122,7 +123,7 @@ public:
     }
 };
 
-bool cmp(const std::unique_ptr<Player>& a, const std::unique_ptr<Player>& b) { 
+bool cmp(const std::shared_ptr<Player>& a, const std::shared_ptr<Player>& b) { 
     if(a->p_turnier == b->p_turnier){
         return a->p_spieler > b->p_spieler;
     }
@@ -133,9 +134,10 @@ bool cmp(const std::unique_ptr<Player>& a, const std::unique_ptr<Player>& b) {
 
 class Tournament {
 private:
-    std::vector<std::unique_ptr<Player>> players;
+    std::vector<std::shared_ptr<Player>> players;
     std::vector<std::unique_ptr<Table>> tables;
     int points_per_page = 0;
+    std::unordered_map<std::string, std::shared_ptr<Player>> player_map;
 
 public:
     Tournament() = default;
@@ -162,10 +164,10 @@ public:
             }
             else { break; }
         }
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         for (int i = 0; i < n_players; i++) {
-            auto p = std::make_unique<Player>();
+            auto p = std::make_shared<Player>();
             std::string name;
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             while (true) {
                 std::cout << "Spielername von Spieler " << i + 1 << ": ";
                 std::getline(std::cin, name);
@@ -179,9 +181,10 @@ public:
             p->name = name;
             p->p_turnier = 0;
             p->p_spieler = 0;
-            players.push_back(std::move(p));
+            players.push_back(p);
+            player_map[name] = p;
         }
-        // Herausforderung hinzufuegen
+        
     }
     
 
@@ -260,7 +263,67 @@ public:
     void play_first_round() {
         undo_tables();
         std::shuffle(players.begin(), players.end(), rng);
+        std::cout << "Gibt es Herausforderungen(j/n): ";
+        std::string answer;
+        std::cin >> answer;
+        if(answer == "j"){
+            
+            while(true){
+                try{
+                    std::cout << "Wie viele Herausforderungen soll es geben?: ";
+                    std::cin >> answer;
+                    is_numeric(answer);
+                    int i = std::stoi(answer);
+                    if(i < 0){
+                        throw std::invalid_argument("[FEHLER!] Eingabe negativ");
+                    }
+                    if(i > static_cast<int>(players.size() / 2)){
+                        throw std::invalid_argument("[FEHLER!] Eingabe zu gross");
+                    }
+                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                    for(int j = 0; j < i; j++){
+                        std::string name;
+                        std::string name2;
+                        std::cout << "Herausforderung Nr. " << j + 1 << ": " << std::endl;
+                        std::cout << "Name des Herausforderers: ";
+                        std::getline(std::cin, name);
+                        if(name.empty()){
+                            throw std::invalid_argument("[FEHLER!] Name leer");
+                        }
+                        if(player_map.find(name) == player_map.end()){
+                            throw std::invalid_argument("[FEHLER!] Name nicht gefunden");
+                        }
 
+                        std::cout << "Name des Herausgeforderten: ";
+                        std::getline(std::cin, name2);
+                        if(name2.empty()){
+                            throw std::invalid_argument("[FEHLER!] Name leer");
+                        }
+                        if(player_map.find(name2) == player_map.end()){
+                            throw std::invalid_argument("[FEHLER!] Name nicht gefunden");
+                        }
+                        
+                        players.erase(std::find(players.begin(), players.end(), player_map[name]));
+                        players.erase(std::find(players.begin(), players.end(), player_map[name2]));
+                        
+                        
+                        players.push_back(player_map[name]);
+                        players.push_back(player_map[name2]);
+                        
+                    }    
+                    break;
+                }catch(std::exception& e){
+                    if (std::string(e.what()) == "stoi") {
+                        std::cout << "[FEHLER!] Ungueltige Eingabe!" << std::endl;
+                        continue;
+                    }
+                    std::cout << e.what() << std::endl;
+                    continue;
+                }
+            }
+
+        }
+        
         for (size_t i = 0; i < tables.size(); i++) {
             tables[i]->set_p1(players[i * 2].get());
             tables[i]->set_p2(players[i * 2 + 1].get());
@@ -300,6 +363,7 @@ public:
         undo_tables();
         
         for (size_t i = 0; i < tables.size(); i++) {
+            //IMPORTANT: CHANGE THE CHECK TO IF THE PLAYERS HAVE PLAYED AGAINST EACH OTHER BEFORE IN GENERAL, NOT JUST ON THIS TABLE
             //Check if both players have already played on this table the round before
             if((players[i * 2].get() == tables[i]->get_p1() && players[i * 2 + 1].get() == tables[i]->get_p2()) || (players[i * 2].get() == tables[i]->get_p2() && players[i * 2 + 1].get() == tables[i]->get_p1())) {
                 std::cout << "[ACHTUNG!] Spieler " << players[i * 2].get()->name << " und " << players[i * 2 + 1].get()->name << " haben bereits gegeneinander gespielt" << std::endl;
